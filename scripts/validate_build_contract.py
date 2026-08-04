@@ -123,6 +123,70 @@ def validate_lock_shape(lock: dict[str, Any]) -> None:
     if android.get("pageSizeBytes") != 16384:
         raise ContractError("android.pageSizeBytes must remain 16384")
 
+    tunnels = require_object(lock.get("tunnels"), "tunnels")
+    if tunnels.get("artifactName") != "xray-tunnel-binaries.zip":
+        raise ContractError("tunnels.artifactName must name the canonical ZIP")
+    if tunnels.get("manifestName") != "tunnel-manifest.json":
+        raise ContractError("tunnels.manifestName must name the canonical manifest")
+    if tunnels.get("minimumApi") != 23:
+        raise ContractError("tunnels.minimumApi must remain 23")
+    if tunnels.get("pageSizeBytes") != 16384:
+        raise ContractError("tunnels.pageSizeBytes must remain 16384")
+    sources = tunnels.get("sources")
+    if not isinstance(sources, list) or len(sources) != 7:
+        raise ContractError("tunnels.sources must contain exactly seven source records")
+    expected_ids = {
+        "badvpn",
+        "libancillary",
+        "hev-socks5-tunnel",
+        "hev-socks5-core",
+        "hev-task-system",
+        "hev-lwip",
+        "hev-yaml",
+    }
+    actual_ids: set[str] = set()
+    paths: set[str] = set()
+    for index, source_value in enumerate(sources):
+        source = require_object(source_value, f"tunnels.sources[{index}]")
+        source_id = require_string(source.get("id"), f"tunnels.sources[{index}].id")
+        actual_ids.add(source_id)
+        require_string(source.get("repository"), f"tunnels.sources[{index}].repository")
+        relative_path = require_string(source.get("path"), f"tunnels.sources[{index}].path")
+        if Path(relative_path).is_absolute() or ".." in Path(relative_path).parts:
+            raise ContractError(f"unsafe tunnel source path: {relative_path}")
+        paths.add(relative_path)
+        if not COMMIT_RE.fullmatch(
+            require_string(source.get("commitSha"), f"tunnels.sources[{index}].commitSha")
+        ):
+            raise ContractError(f"tunnel source commit must be full SHA: {source_id}")
+        require_string(
+            source.get("licenseExpression"),
+            f"tunnels.sources[{index}].licenseExpression",
+        )
+        license_files = source.get("licenseFiles")
+        if not isinstance(license_files, list) or not license_files:
+            raise ContractError(f"tunnel source must own license evidence: {source_id}")
+        for license_index, license_value in enumerate(license_files):
+            license_file = require_object(
+                license_value,
+                f"tunnels.sources[{index}].licenseFiles[{license_index}]",
+            )
+            license_path = require_string(
+                license_file.get("path"),
+                f"tunnels.sources[{index}].licenseFiles[{license_index}].path",
+            )
+            if Path(license_path).is_absolute() or ".." in Path(license_path).parts:
+                raise ContractError(f"unsafe tunnel license path: {license_path}")
+            if not SHA256_RE.fullmatch(
+                require_string(
+                    license_file.get("sha256"),
+                    f"tunnels.sources[{index}].licenseFiles[{license_index}].sha256",
+                )
+            ):
+                raise ContractError(f"invalid tunnel license SHA-256: {source_id}")
+    if actual_ids != expected_ids or len(paths) != len(sources):
+        raise ContractError("tunnel source identities and paths must be exact and unique")
+
     source_inputs = require_object(lock.get("sourceInputs"), "sourceInputs")
     required_inputs = {
         "go.mod",
@@ -182,6 +246,33 @@ def validate_source_inputs(root: Path, lock: dict[str, Any]) -> None:
         raise ContractError(
             f"Go directive drift: expected {lock['go']['directive']}, got {directive}"
         )
+
+    for source in lock["tunnels"]["sources"]:
+        source_root = (root / source["path"]).resolve()
+        if root not in source_root.parents or not source_root.is_dir():
+            raise ContractError(f"missing or unsafe tunnel source: {source['path']}")
+        actual_commit = command_output(["git", "rev-parse", "HEAD"], source_root)
+        if actual_commit != source["commitSha"]:
+            raise ContractError(
+                f"tunnel source commit drift for {source['id']}: "
+                f"expected {source['commitSha']}, got {actual_commit}"
+            )
+        status = command_output(
+            ["git", "status", "--porcelain=v1", "--untracked-files=no"],
+            source_root,
+        )
+        if status:
+            raise ContractError(f"tunnel source is dirty: {source['id']}")
+        for license_file in source["licenseFiles"]:
+            license_path = source_root / license_file["path"]
+            if (
+                not license_path.is_file()
+                or sha256_file(license_path) != license_file["sha256"]
+            ):
+                raise ContractError(
+                    f"tunnel license evidence drift: "
+                    f"{source['id']}/{license_file['path']}"
+                )
 
 
 def validate_workflows(root: Path, lock: dict[str, Any]) -> None:

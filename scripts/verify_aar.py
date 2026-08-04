@@ -12,7 +12,10 @@ import sys
 from typing import Any
 import zipfile
 
-from validate_build_contract import ContractError, load_lock, sha256_file
+try:
+    from .validate_build_contract import ContractError, load_lock, sha256_file
+except ImportError:
+    from validate_build_contract import ContractError, load_lock, sha256_file
 
 
 ELF_MACHINE_BY_ABI = {

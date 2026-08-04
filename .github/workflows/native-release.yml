@@ -31,6 +31,7 @@ jobs:
         with:
           ref: ${{ inputs.expected_source_sha }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Validate release inputs and source
         env:
@@ -71,13 +72,19 @@ jobs:
       - name: Verify GitHub build attestation
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh attestation verify "$RUNNER_TEMP/release-bundle/libv2ray.aar"
-          --repo "$GITHUB_REPOSITORY"
-          --bundle "$RUNNER_TEMP/release-bundle/github-attestation.jsonl"
-          --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/native-build.yml"
-          --source-digest "${{ inputs.expected_source_sha }}"
-          --deny-self-hosted-runners
+        run: |
+          gh attestation verify "$RUNNER_TEMP/release-bundle/libv2ray.aar" \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle "$RUNNER_TEMP/release-bundle/github-attestation.jsonl" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/native-build.yml" \
+            --source-digest "${{ inputs.expected_source_sha }}" \
+            --deny-self-hosted-runners
+          gh attestation verify "$RUNNER_TEMP/release-bundle/xray-tunnel-binaries.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle "$RUNNER_TEMP/release-bundle/github-attestation.jsonl" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/native-build.yml" \
+            --source-digest "${{ inputs.expected_source_sha }}" \
+            --deny-self-hosted-runners
 
       - name: Create or verify annotated tag
         env:
