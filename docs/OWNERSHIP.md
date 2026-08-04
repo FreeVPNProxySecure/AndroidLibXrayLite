@@ -14,10 +14,14 @@
 fork ancestry. `2dust/AndroidLibXrayLite` is the original source fork. Neither is
 an authorized publication location for VPNProtocols after migration.
 
-The Go module path remains `github.com/tim06/AndroidLibXrayLite`. Repository
-ownership and module identity are separate concerns; changing the module path
-would add generated API and dependency identity risk without improving the
-release trust boundary.
+The canonical Go module path is
+`github.com/FreeVPNProxySecure/AndroidLibXrayLite`. The historical
+`github.com/tim06/AndroidLibXrayLite` path remains provenance, not an input.
+This migration is required because gomobile persists a local module replacement
+path in Go build info even with `-trimpath`. Building the exact commit as a
+canonical version through a deterministic local module proxy removes the host
+path without rewriting native binaries. Generated Java/JNI API comparison is a
+mandatory release gate for this identity change.
 
 ## Consumer Boundary
 

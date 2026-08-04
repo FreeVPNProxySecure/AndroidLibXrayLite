@@ -20,6 +20,7 @@ REQUIRED_FILES = {
     "artifact-manifest.json",
     "components.cdx.json",
     "licenses.json",
+    "license-texts.zip",
     "advisory-summary.json",
     "govulncheck.json",
     "module-graph.json",
@@ -48,7 +49,10 @@ def verify_checksums(bundle: Path) -> None:
         if relative in expected or relative == "checksums.txt":
             raise ContractError(f"invalid duplicate/self checksum row: {relative}")
         path = bundle / relative
-        if not path.is_file() or path.resolve().parent != bundle.resolve() and bundle.resolve() not in path.resolve().parents:
+        if not path.is_file() or (
+            path.resolve().parent != bundle.resolve()
+            and bundle.resolve() not in path.resolve().parents
+        ):
             raise ContractError(f"unsafe or missing checksummed file: {relative}")
         expected[relative] = fields[0]
     actual_files = {

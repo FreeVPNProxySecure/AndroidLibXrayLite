@@ -38,7 +38,9 @@ the exact data portions intended by that build:
    build run completed successfully for the same repository/SHA/workflow, and
    every bundled file matches the signed manifest.
 4. The workflow creates one annotated tag and uploads the already verified
-   bundle. It performs no native build and no source mutation.
+   bundle. License texts are carried as the deterministic top-level
+   `license-texts.zip` asset so the published GitHub Release is complete. The
+   workflow performs no native build and no source mutation.
 5. Existing tags or releases cause a hard failure.
 
 ## Consumer Acceptance

@@ -1,4 +1,4 @@
-module github.com/tim06/AndroidLibXrayLite
+module github.com/FreeVPNProxySecure/AndroidLibXrayLite
 
 go 1.25.0
 

@@ -75,6 +75,10 @@ def validate_lock_shape(lock: dict[str, Any]) -> None:
         raise ContractError("unexpected native build contract")
     if lock.get("canonicalRepository") != "FreeVPNProxySecure/AndroidLibXrayLite":
         raise ContractError("canonicalRepository must name the organization fork")
+    if lock.get("modulePath") != "github.com/FreeVPNProxySecure/AndroidLibXrayLite":
+        raise ContractError("modulePath must name the canonical organization module")
+    if lock.get("legacyModulePath") != "github.com/tim06/AndroidLibXrayLite":
+        raise ContractError("legacyModulePath must preserve the historical identity")
 
     go = require_object(lock.get("go"), "go")
     require_string(go.get("version"), "go.version")

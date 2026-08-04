@@ -1,9 +1,9 @@
 # AndroidLibXrayLite
 
 AndroidLibXrayLite produces the Xray Android AAR consumed by VPNProtocols.
-The canonical repository is owned by the `FreeVPNProxySecure` organization.
-The historical `github.com/tim06/AndroidLibXrayLite` module path is retained to
-preserve generated API identity and downstream compatibility.
+The canonical repository and Go module are owned by the `FreeVPNProxySecure`
+organization. The historical `github.com/tim06/AndroidLibXrayLite` identity is
+retained in provenance as the legacy source path, not as a build dependency.
 
 ## Build Contract
 
@@ -39,6 +39,12 @@ scripts/build-android-aar.sh /absolute/path/to/output
 The build never downloads or refreshes geo assets and never mutates `go.mod`,
 `go.sum`, the NDK, or tracked source. Asset refresh is a separate reviewed
 source change governed by [`docs/RELEASES.md`](docs/RELEASES.md).
+
+gomobile normally creates an absolute filesystem `replace` for a local package,
+which is then persisted in Go build info. The build entrypoint instead packages
+the exact clean commit as a deterministic local module proxy version and binds
+that version. The resulting native payload names the canonical module/version
+without embedding the checkout or temporary directory.
 
 ## Release Model
 

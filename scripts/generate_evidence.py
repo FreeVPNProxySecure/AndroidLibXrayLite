@@ -14,11 +14,16 @@ import shutil
 import sys
 from typing import Any, Iterator
 from urllib.parse import quote
+import zipfile
 
-from validate_build_contract import ContractError, load_lock, sha256_file
+try:
+    from .validate_build_contract import ContractError, load_lock
+except ImportError:
+    from validate_build_contract import ContractError, load_lock
 
 
 LICENSE_NAMES = ("LICENSE", "LICENCE", "COPYING", "NOTICE")
+ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 
 
 def decode_json_stream(path: Path) -> Iterator[dict[str, Any]]:
@@ -354,6 +359,28 @@ def write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def archive_license_texts(output: Path) -> Path:
+    source = output / "licenses"
+    if not source.is_dir():
+        raise ContractError("license text directory is missing")
+    files = sorted(path for path in source.rglob("*") if path.is_file())
+    if not files:
+        raise ContractError("license text inventory is empty")
+    destination = output / "license-texts.zip"
+    with zipfile.ZipFile(
+        destination, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
+        for path in files:
+            relative = path.relative_to(output).as_posix()
+            info = zipfile.ZipInfo(relative, ZIP_TIMESTAMP)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = (0o100644 << 16)
+            archive.writestr(info, path.read_bytes())
+    shutil.rmtree(source)
+    return destination
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -407,12 +434,14 @@ def main() -> int:
         write_json(output / "licenses.json", licenses)
         write_json(output / "advisory-summary.json", advisory)
         write_json(output / "provenance.json", provenance)
+        archive_license_texts(output)
 
         notices = [
             "# Third-Party Notices",
             "",
             "This release contains the following Go modules and recorded license expressions.",
-            "The corresponding detected root license texts are included in `licenses/`.",
+            "The corresponding detected root license texts are included in "
+            "`license-texts.zip` under `licenses/`.",
             "",
         ]
         for row in licenses["components"]:

@@ -9,7 +9,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
+from source_module_proxy import create_source_module_proxy
 from validate_build_contract import ContractError, validate
 from verify_aar import verify_archive
 
@@ -105,26 +107,58 @@ def build(root: Path, output: Path) -> Path:
 
     artifact = output / lock["release"]["artifactName"]
     targets = ",".join(target["gomobile"] for target in lock["android"]["targets"])
-    command = [
-        str(gomobile),
-        "bind",
-        "-v",
-        "-trimpath",
-        f"-androidapi={lock['android']['minimumApi']}",
-        f"-target={targets}",
-        "-ldflags",
-        lock["android"]["ldflags"],
-        "-o",
-        str(artifact),
-        "./",
-    ]
-    run(command, root=root, env=env)
+    with tempfile.TemporaryDirectory(prefix="xray-module-build-") as temp_raw:
+        temp = Path(temp_raw)
+        proxy = create_source_module_proxy(
+            root,
+            temp / "proxy",
+            lock["modulePath"],
+            source_sha,
+            int(source_epoch),
+        )
+        driver = temp / "driver"
+        driver.mkdir()
+        (driver / "go.mod").write_text(
+            "module native.build/androidlibxraylite\n\n"
+            f"go {lock['go']['directive']}\n\n"
+            f"require {lock['modulePath']} {proxy['version']}\n",
+            encoding="utf-8",
+        )
+        build_env = {
+            **env,
+            "GONOSUMDB": lock["modulePath"],
+            "GOPROXY": f"file://{proxy['proxyRoot']},https://proxy.golang.org",
+        }
+        run(
+            ["go", "mod", "download", f"{lock['modulePath']}@{proxy['version']}"],
+            root=driver,
+            env=build_env,
+        )
+        command = [
+            str(gomobile),
+            "bind",
+            "-v",
+            "-trimpath",
+            f"-androidapi={lock['android']['minimumApi']}",
+            f"-target={targets}",
+            "-ldflags",
+            lock["android"]["ldflags"],
+            "-o",
+            str(artifact),
+            lock["modulePath"],
+        ]
+        run(command, root=driver, env=build_env)
 
-    manifest = verify_archive(artifact, root, [str(root)])
+    manifest = verify_archive(artifact, root, [str(root), temp_raw])
     manifest["source"] = {
         "repository": lock["canonicalRepository"],
         "commitSha": source_sha,
         "sourceDateEpoch": int(source_epoch),
+        "modulePath": proxy["modulePath"],
+        "moduleVersion": proxy["version"],
+        "moduleZipSha256": proxy["zipSha256"],
+        "moduleZipSize": proxy["zipSize"],
+        "moduleFileCount": proxy["fileCount"],
     }
     manifest_path = output / "artifact-manifest.json"
     import json
