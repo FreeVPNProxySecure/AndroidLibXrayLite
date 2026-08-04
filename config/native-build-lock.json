@@ -75,7 +75,7 @@
     "actions/checkout": "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
     "actions/download-artifact": "37930b1c2abaa49bbe596cd826c3c89aef350131",
     "actions/setup-java": "b6effb05e454b25005698d916606bdc6ffcbf961",
-    "actions/setup-go": "4dc6199c7b1a012772edbd06daecab0f50c9053c",
+    "actions/setup-go": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
     "actions/upload-artifact": "b7c566a772e6b6bfb58ed0dc250532a479d7789f",
     "actions/attest-build-provenance": "0f67c3f4856b2e3261c31976d6725780e5e4c373",
     "nttld/setup-ndk": "ed92fe6cadad69be94a966a7ee3271275e62f779"
