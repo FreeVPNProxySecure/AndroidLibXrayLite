@@ -1,151 +1,73 @@
 package libv2ray
 
 import (
-	"bufio"
-	"context"
-	"fmt"
 	"net"
-	"sync"
 	"testing"
 	"time"
-
-	v2net "github.com/xtls/xray-core/common/net"
 )
 
 type fakeSupportSet struct{}
 
-func (f fakeSupportSet) Protect(int) bool {
+func (fakeSupportSet) Protect(int) bool {
 	return true
 }
 
-func TestProtectedDialer_PrepareDomain(t *testing.T) {
-	type args struct {
-		domainName string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		// TODO: Add test cases.
-		{"", args{"baidu.com:80"}},
-		// {"", args{"cloudflare.com:443"}},
-		// {"", args{"apple.com:443"}},
-		// {"", args{"110.110.110.110:443"}},
-		// {"", args{"[2002:1234::1]:443"}},
-	}
-	d := NewPreotectedDialer(fakeSupportSet{})
-	for _, tt := range tests {
-		ch := make(chan struct{})
-		t.Run(tt.name, func(t *testing.T) {
-			go d.PrepareDomain(tt.args.domainName, ch, false)
-
-			time.Sleep(time.Second)
-			go d.vServer.NextIP()
-			t.Log(d.vServer.currentIP())
-		})
+func TestResolvedCurrentIP(t *testing.T) {
+	resolvedAddress := &resolved{
+		domain: "example.invalid",
+		IPs: []net.IP{
+			net.ParseIP("192.0.2.1"),
+			net.ParseIP("2001:db8::1"),
+		},
 	}
 
-	time.Sleep(time.Second)
-}
-
-func TestProtectedDialer_Dial(t *testing.T) {
-
-	tests := []struct {
-		name    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"baidu.com:80", false},
-		{"cloudflare.com:80", false},
-		{"172.16.192.11:80", true},
-		// {"172.16.192.10:80", true},
-		// {"[2fff:4322::1]:443", true},
-		// {"[fc00::1]:443", true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ch := make(chan struct{})
-
-			d := NewPreotectedDialer(fakeSupportSet{})
-			d.currentServer = tt.name
-
-			go d.PrepareDomain(tt.name, ch, false)
-
-			var wg sync.WaitGroup
-
-			dial := func() {
-				defer wg.Done()
-				dest, _ := v2net.ParseDestination("tcp:" + tt.name)
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				defer cancel()
-
-				conn, err := d.Dial(ctx, nil, dest, nil)
-				if err != nil {
-					t.Log(err)
-					return
-				}
-				_host, _, _ := net.SplitHostPort(tt.name)
-				fmt.Fprintf(conn, fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", _host))
-				status, err := bufio.NewReader(conn).ReadString('\n')
-				t.Logf("%#v, %#v\n", status, err)
-				conn.Close()
-			}
-
-			for n := 0; n < 3; n++ {
-				wg.Add(1)
-				go dial()
-				// time.Sleep(time.Millisecond * 10)
-				// d.pendingMap[tt.name] = make(chan struct{})
-			}
-
-			wg.Wait()
-		})
+	if got := resolvedAddress.currentIP(); !got.Equal(net.ParseIP("192.0.2.1")) {
+		t.Fatalf("unexpected initial IP: %v", got)
 	}
 }
 
-func Test_resolved_NextIP(t *testing.T) {
-	type fields struct {
-		domain string
-		IPs    []net.IP
-		Port   int
+func TestResolvedNextIPCyclesDeterministically(t *testing.T) {
+	resolvedAddress := &resolved{
+		domain: "example.invalid",
+		IPs: []net.IP{
+			net.ParseIP("192.0.2.1"),
+			net.ParseIP("192.0.2.2"),
+		},
+		lastSwitched: time.Unix(0, 0),
 	}
-	tests := []struct {
-		name   string
-		fields fields
-	}{
-		// TODO: Add test cases.
-		{"test1",
-			fields{
-				domain: "www.baidu.com",
-				IPs: []net.IP{
-					net.ParseIP("1.2.3.4"),
-					net.ParseIP("4.3.2.1"),
-					net.ParseIP("1234::1"),
-					net.ParseIP("4321::1"),
-				},
-			}},
+
+	resolvedAddress.NextIP()
+	if got := resolvedAddress.currentIP(); !got.Equal(net.ParseIP("192.0.2.2")) {
+		t.Fatalf("unexpected IP after first switch: %v", got)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &resolved{
-				domain: tt.fields.domain,
-				IPs:    tt.fields.IPs,
-				Port:   tt.fields.Port,
-			}
-			t.Logf("%v", r.IPs)
-			t.Logf("%v", r.currentIP())
-			r.NextIP()
-			t.Logf("%v", r.currentIP())
-			r.NextIP()
-			t.Logf("%v", r.currentIP())
-			r.NextIP()
-			t.Logf("%v", r.currentIP())
-			time.Sleep(3 * time.Second)
-			r.NextIP()
-			t.Logf("%v", r.currentIP())
-			time.Sleep(5 * time.Second)
-			r.NextIP()
-			t.Logf("%v", r.currentIP())
-		})
+
+	resolvedAddress.lastSwitched = time.Unix(0, 0)
+	resolvedAddress.NextIP()
+	if got := resolvedAddress.currentIP(); !got.Equal(net.ParseIP("192.0.2.1")) {
+		t.Fatalf("unexpected IP after wraparound: %v", got)
+	}
+}
+
+func TestResolvedNextIPKeepsSingleAddress(t *testing.T) {
+	resolvedAddress := &resolved{
+		IPs:          []net.IP{net.ParseIP("192.0.2.1")},
+		lastSwitched: time.Unix(0, 0),
+	}
+
+	resolvedAddress.NextIP()
+	if got := resolvedAddress.currentIP(); !got.Equal(net.ParseIP("192.0.2.1")) {
+		t.Fatalf("single IP changed: %v", got)
+	}
+}
+
+func TestProtectedDialerResolveChannelLifecycle(t *testing.T) {
+	dialer := NewPreotectedDialer(fakeSupportSet{})
+	if dialer.IsVServerReady() {
+		t.Fatal("new dialer unexpectedly has a prepared server")
+	}
+
+	dialer.PrepareResolveChan()
+	if dialer.ResolveChan() == nil {
+		t.Fatal("resolve channel was not initialized")
 	}
 }

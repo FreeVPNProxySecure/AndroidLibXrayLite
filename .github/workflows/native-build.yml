@@ -1,0 +1,182 @@
+name: Native build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+env:
+  GO_VERSION: "1.25.12"
+  GOMOBILE_VERSION: "v0.0.0-20250106192035-c31d5b91ecc3"
+  GOVULNCHECK_VERSION: "v1.6.0"
+  NDK_VERSION: "r28c"
+  GOTOOLCHAIN: local
+  GOFLAGS: -mod=readonly
+
+jobs:
+  build:
+    name: Independent build ${{ matrix.copy }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        copy: [a, b]
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 21.0.12+8.0.LTS
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25.12"
+          check-latest: false
+          cache: true
+
+      - name: Set up Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
+        with:
+          ndk-version: r28c
+          add-to-path: false
+          link-to-sdk: false
+          local-cache: false
+
+      - name: Validate locked source and toolchains
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: >-
+          python3 scripts/validate_build_contract.py
+          --check-toolchain
+          --ndk-home "$ANDROID_NDK_HOME"
+          --source-sha "$GITHUB_SHA"
+
+      - name: Verify module state
+        run: |
+          go mod verify
+          go mod tidy -diff
+
+      - name: Run deterministic tests
+        run: |
+          python3 -m unittest discover -s tests -v
+          go test ./...
+
+      - name: Install locked gomobile
+        run: go install golang.org/x/mobile/cmd/gomobile@"$GOMOBILE_VERSION"
+
+      - name: Build locked AAR
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: scripts/build-android-aar.sh "$RUNNER_TEMP/native-build-${{ matrix.copy }}"
+
+      - name: Upload independent build
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: native-build-${{ matrix.copy }}
+          path: ${{ runner.temp }}/native-build-${{ matrix.copy }}
+          if-no-files-found: error
+          retention-days: 7
+
+  evidence:
+    name: Compare and package evidence
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25.12"
+          check-latest: false
+          cache: true
+
+      - name: Download build A
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: native-build-a
+          path: ${{ runner.temp }}/native-build-a
+
+      - name: Download build B
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: native-build-b
+          path: ${{ runner.temp }}/native-build-b
+
+      - name: Compare independent rebuilds
+        run: >-
+          python3 scripts/compare_rebuilds.py
+          "$RUNNER_TEMP/native-build-a/libv2ray.aar"
+          "$RUNNER_TEMP/native-build-b/libv2ray.aar"
+
+      - name: Prepare evidence inputs
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-bundle"
+          cp "$RUNNER_TEMP/native-build-a/libv2ray.aar" "$RUNNER_TEMP/release-bundle/"
+          cp "$RUNNER_TEMP/native-build-a/artifact-manifest.json" "$RUNNER_TEMP/release-bundle/"
+          go list -mod=readonly -m -json all > "$RUNNER_TEMP/release-bundle/module-graph.json"
+          go list -mod=readonly -deps -json ./... > "$RUNNER_TEMP/release-bundle/package-graph.json"
+          go mod graph > "$RUNNER_TEMP/release-bundle/module-edges.txt"
+          go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
+
+      - name: Capture advisory evidence
+        id: advisory
+        shell: bash
+        run: |
+          set +e
+          govulncheck -json ./... > "$RUNNER_TEMP/release-bundle/govulncheck.json"
+          status=$?
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Generate dependency and provenance evidence
+        run: >-
+          python3 scripts/generate_evidence.py
+          --artifact-manifest "$RUNNER_TEMP/release-bundle/artifact-manifest.json"
+          --module-graph "$RUNNER_TEMP/release-bundle/module-graph.json"
+          --package-graph "$RUNNER_TEMP/release-bundle/package-graph.json"
+          --module-edges "$RUNNER_TEMP/release-bundle/module-edges.txt"
+          --govulncheck "$RUNNER_TEMP/release-bundle/govulncheck.json"
+          --govulncheck-exit-code "${{ steps.advisory.outputs.exit_code }}"
+          --output "$RUNNER_TEMP/release-bundle"
+
+      - name: Attest release AAR
+        if: github.event_name != 'pull_request'
+        id: attest
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: ${{ runner.temp }}/release-bundle/libv2ray.aar
+
+      - name: Add attestation bundle
+        if: github.event_name != 'pull_request'
+        run: cp "${{ steps.attest.outputs.bundle-path }}" "$RUNNER_TEMP/release-bundle/github-attestation.jsonl"
+
+      - name: Write release checksums
+        run: python3 scripts/write_checksums.py "$RUNNER_TEMP/release-bundle"
+
+      - name: Upload verified release bundle
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: xray-native-release-bundle
+          path: ${{ runner.temp }}/release-bundle
+          if-no-files-found: error
+          retention-days: 10
