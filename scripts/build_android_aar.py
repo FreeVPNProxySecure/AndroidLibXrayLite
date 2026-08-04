@@ -11,9 +11,14 @@ import subprocess
 import sys
 import tempfile
 
-from source_module_proxy import create_source_module_proxy
-from validate_build_contract import ContractError, validate
-from verify_aar import verify_archive
+try:
+    from .source_module_proxy import create_source_module_proxy
+    from .validate_build_contract import ContractError, validate
+    from .verify_aar import verify_archive
+except ImportError:
+    from source_module_proxy import create_source_module_proxy
+    from validate_build_contract import ContractError, validate
+    from verify_aar import verify_archive
 
 
 def run(
@@ -121,7 +126,10 @@ def build(root: Path, output: Path) -> Path:
         (driver / "go.mod").write_text(
             "module native.build/androidlibxraylite\n\n"
             f"go {lock['go']['directive']}\n\n"
-            f"require {lock['modulePath']} {proxy['version']}\n",
+            "require (\n"
+            f"\t{lock['modulePath']} {proxy['version']}\n"
+            f"\t{lock['gomobile']['module']} {lock['gomobile']['version']}\n"
+            ")\n",
             encoding="utf-8",
         )
         build_env = {
@@ -129,10 +137,11 @@ def build(root: Path, output: Path) -> Path:
             "GONOSUMDB": lock["modulePath"],
             "GOPROXY": f"file://{proxy['proxyRoot']},https://proxy.golang.org",
         }
+        prepare_env = {**build_env, "GOFLAGS": "-mod=mod"}
         run(
-            ["go", "mod", "download", f"{lock['modulePath']}@{proxy['version']}"],
+            ["go", "mod", "download", "all"],
             root=driver,
-            env=build_env,
+            env=prepare_env,
         )
         command = [
             str(gomobile),
