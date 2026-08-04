@@ -57,7 +57,11 @@ def spdx_from_text(text: str) -> str | None:
     if "permission is hereby granted, free of charge" in normalized:
         return "MIT"
     if "redistribution and use in source and binary forms" in normalized:
-        if "neither the name" in normalized or "contributors may be used to endorse" in normalized:
+        if (
+            "neither the name" in normalized
+            or "contributors may be used to endorse" in normalized
+            or "name of the author may not be used to endorse" in normalized
+        ):
             return "BSD-3-Clause"
         return "BSD-2-Clause"
     if "permission to use, copy, modify, and/or distribute this software" in normalized:
@@ -221,6 +225,68 @@ def generate_components_and_licenses(
             }
         )
 
+    lock = load_lock(root)
+    for source_index, source in enumerate(lock["tunnels"]["sources"], start=len(modules)):
+        key = f"git:{source['repository']}@{source['commitSha']}"
+        bom_ref = (
+            f"pkg:generic/{quote(source['repository'], safe='/')}@{source['commitSha']}"
+        )
+        bom_refs[key] = bom_ref
+        copied: list[dict[str, Any]] = []
+        detected_expressions: set[str] = set()
+        for license_file in source["licenseFiles"]:
+            candidate = root / source["path"] / license_file["path"]
+            payload = candidate.read_bytes()
+            if hashlib.sha256(payload).hexdigest() != license_file["sha256"]:
+                raise ContractError(f"tunnel license evidence mismatch for {key}")
+            target_name = (
+                f"{source_index:03d}-{safe_name(source['repository'])}-"
+                f"{safe_name(license_file['path'])}"
+            )
+            target = license_output / target_name
+            shutil.copyfile(candidate, target)
+            detected = spdx_from_text(payload.decode("utf-8", errors="replace"))
+            if detected:
+                detected_expressions.add(detected)
+            copied.append(
+                {
+                    "path": f"licenses/{target_name}",
+                    "sha256": license_file["sha256"],
+                    "detectedSpdx": detected,
+                }
+            )
+        if detected_expressions != set(source["licenseExpression"].split(" AND ")):
+            raise ContractError(f"tunnel license expression mismatch for {key}")
+        components.append(
+            {
+                "type": "library",
+                "bom-ref": bom_ref,
+                "name": source["repository"],
+                "version": source["commitSha"],
+                "purl": bom_ref,
+                "licenses": [{"expression": source["licenseExpression"]}],
+                "properties": [
+                    {
+                        "name": "androidlibxraylite:license-source",
+                        "value": "pinned-source-license",
+                    },
+                    {
+                        "name": "androidlibxraylite:source-path",
+                        "value": source["path"],
+                    },
+                ],
+            }
+        )
+        license_rows.append(
+            {
+                "component": key,
+                "licenseExpression": source["licenseExpression"],
+                "source": "pinned-source-license",
+                "files": copied,
+                "disposition": None,
+            }
+        )
+
     if unknown:
         raise ContractError(
             "license evidence is incomplete; add reviewed dispositions for: "
@@ -381,6 +447,58 @@ def archive_license_texts(output: Path) -> Path:
     return destination
 
 
+def validate_tunnel_evidence(
+    lock: dict[str, Any],
+    tunnel_manifest: dict[str, Any],
+    tunnel_advisories: dict[str, Any],
+    source_sha: str,
+) -> None:
+    tunnel = lock["tunnels"]
+    expected_records = [
+        {
+            "identity": f"git:{source['repository']}@{source['commitSha']}",
+            "query": {"commit": source["commitSha"]},
+            "status": "complete",
+            "advisoryIds": [],
+        }
+        for source in tunnel["sources"]
+    ]
+    if (
+        tunnel_manifest.get("schemaVersion") != 1
+        or tunnel_manifest.get("contract")
+        != "androidlibxraylite-tunnel-manifest-v1"
+        or tunnel_manifest.get("artifact", {}).get("name")
+        != tunnel["artifactName"]
+        or tunnel_manifest.get("source")
+        != {"repository": lock["canonicalRepository"], "commitSha": source_sha}
+        or tunnel_manifest.get("upstreamSources") != tunnel["sources"]
+        or tunnel_manifest.get("toolchain")
+        != {
+            "androidNdk": lock["android"]["ndk"],
+            "minimumApi": tunnel["minimumApi"],
+            "pageSizeBytes": tunnel["pageSizeBytes"],
+        }
+    ):
+        raise ContractError("tunnel manifest is inconsistent with the build lock")
+    if (
+        tunnel_advisories.get("schemaVersion") != 1
+        or tunnel_advisories.get("contract")
+        != "androidlibxraylite-tunnel-advisory-evidence-v1"
+        or tunnel_advisories.get("provider")
+        != {"name": "OSV", "endpoint": "https://api.osv.dev/v1/querybatch"}
+        or tunnel_advisories.get("reviewedAt") != lock["reviewedAt"]
+        or tunnel_advisories.get("findingCount") != 0
+        or tunnel_advisories.get("records") != expected_records
+    ):
+        raise ContractError("tunnel advisory evidence is incomplete or inconsistent")
+
+
+def copy_evidence_input(source: Path, output: Path, name: str) -> None:
+    destination = output / name
+    if source.resolve() != destination.resolve():
+        shutil.copyfile(source, destination)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -390,6 +508,8 @@ def main() -> int:
     parser.add_argument("--module-edges", type=Path, required=True)
     parser.add_argument("--govulncheck", type=Path, required=True)
     parser.add_argument("--govulncheck-exit-code", type=int, required=True)
+    parser.add_argument("--tunnel-manifest", type=Path, required=True)
+    parser.add_argument("--tunnel-advisories", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -410,6 +530,26 @@ def main() -> int:
         advisory = generate_advisory_summary(
             args.govulncheck, args.govulncheck_exit_code, lock["modulePath"]
         )
+        tunnel_manifest = json.loads(args.tunnel_manifest.read_text(encoding="utf-8"))
+        tunnel_advisories = json.loads(
+            args.tunnel_advisories.read_text(encoding="utf-8")
+        )
+        validate_tunnel_evidence(
+            lock,
+            tunnel_manifest,
+            tunnel_advisories,
+            artifact_manifest["source"]["commitSha"],
+        )
+        copy_evidence_input(
+            args.tunnel_manifest,
+            output,
+            lock["tunnels"]["manifestName"],
+        )
+        copy_evidence_input(
+            args.tunnel_advisories,
+            output,
+            "tunnel-advisories.json",
+        )
         provenance = {
             "schemaVersion": 1,
             "contract": "androidlibxraylite-build-provenance-v1",
@@ -429,6 +569,13 @@ def main() -> int:
                 "comparison": "byte-identical",
             },
             "output": artifact_manifest["artifact"],
+            "tunnelOutput": tunnel_manifest["artifact"],
+            "tunnelSources": tunnel_manifest["upstreamSources"],
+            "tunnelAdvisoryEvidence": {
+                "contract": tunnel_advisories["contract"],
+                "findingCount": tunnel_advisories["findingCount"],
+                "recordCount": len(tunnel_advisories["records"]),
+            },
         }
         write_json(output / "components.cdx.json", bom)
         write_json(output / "licenses.json", licenses)
@@ -453,6 +600,7 @@ def main() -> int:
             "# AndroidLibXrayLite native release\n\n"
             f"Source commit: `{artifact_manifest['source']['commitSha']}`\n\n"
             f"AAR SHA-256: `{artifact_manifest['artifact']['sha256']}`\n\n"
+            f"Tunnel bundle SHA-256: `{tunnel_manifest['artifact']['sha256']}`\n\n"
             "The release includes independent rebuild, dependency, license, advisory, "
             "native compatibility, checksum, and GitHub build provenance evidence.\n"
         )

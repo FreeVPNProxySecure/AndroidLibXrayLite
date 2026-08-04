@@ -10,14 +10,25 @@ from pathlib import Path
 import re
 import sys
 
-from validate_build_contract import ContractError, load_lock
-from verify_aar import verify_archive
+try:
+    from .build_tunnel_bundle import verify_tunnel_archive
+    from .generate_evidence import validate_tunnel_evidence
+    from .validate_build_contract import ContractError, load_lock
+    from .verify_aar import verify_archive
+except ImportError:
+    from build_tunnel_bundle import verify_tunnel_archive
+    from generate_evidence import validate_tunnel_evidence
+    from validate_build_contract import ContractError, load_lock
+    from verify_aar import verify_archive
 
 
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 REQUIRED_FILES = {
     "libv2ray.aar",
     "artifact-manifest.json",
+    "xray-tunnel-binaries.zip",
+    "tunnel-manifest.json",
+    "tunnel-advisories.json",
     "components.cdx.json",
     "licenses.json",
     "license-texts.zip",
@@ -95,9 +106,48 @@ def main() -> int:
         verified = verify_archive(bundle / lock["release"]["artifactName"], root)
         if verified["artifact"]["sha256"] != manifest.get("artifact", {}).get("sha256"):
             raise ContractError("artifact manifest AAR digest mismatch")
+        tunnel_manifest = json.loads(
+            (bundle / lock["tunnels"]["manifestName"]).read_text(encoding="utf-8")
+        )
+        verified_tunnel = verify_tunnel_archive(
+            bundle / lock["tunnels"]["artifactName"], root
+        )
+        expected_tunnel_manifest = {
+            "schemaVersion": 1,
+            "contract": "androidlibxraylite-tunnel-manifest-v1",
+            "artifact": verified_tunnel["artifact"],
+            "source": {
+                "repository": lock["canonicalRepository"],
+                "commitSha": args.source_sha,
+            },
+            "upstreamSources": lock["tunnels"]["sources"],
+            "toolchain": {
+                "androidNdk": lock["android"]["ndk"],
+                "minimumApi": lock["tunnels"]["minimumApi"],
+                "pageSizeBytes": lock["tunnels"]["pageSizeBytes"],
+            },
+            "entries": verified_tunnel["entries"],
+        }
+        if tunnel_manifest != expected_tunnel_manifest:
+            raise ContractError("tunnel manifest does not describe the release artifact")
+        tunnel_advisories = json.loads(
+            (bundle / "tunnel-advisories.json").read_text(encoding="utf-8")
+        )
+        validate_tunnel_evidence(
+            lock,
+            tunnel_manifest,
+            tunnel_advisories,
+            args.source_sha,
+        )
         provenance = json.loads((bundle / "provenance.json").read_text(encoding="utf-8"))
         if provenance.get("source", {}).get("commitSha") != args.source_sha:
             raise ContractError("provenance source SHA mismatch")
+        if (
+            provenance.get("output") != verified["artifact"]
+            or provenance.get("tunnelOutput") != verified_tunnel["artifact"]
+            or provenance.get("tunnelSources") != lock["tunnels"]["sources"]
+        ):
+            raise ContractError("provenance output closure mismatch")
         advisory = json.loads((bundle / "advisory-summary.json").read_text(encoding="utf-8"))
         if advisory.get("scannerExitCode") != 0 or advisory.get("reachableFindingCount") != 0:
             raise ContractError("advisory evidence is not release-clean")

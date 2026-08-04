@@ -46,6 +46,109 @@
     "pageSizeBytes": 16384,
     "ldflags": "-s -w -buildid= -linkmode=external -extldflags \"-Wl,-z,common-page-size=16384 -Wl,-z,max-page-size=16384\""
   },
+  "tunnels": {
+    "artifactName": "xray-tunnel-binaries.zip",
+    "manifestName": "tunnel-manifest.json",
+    "minimumApi": 23,
+    "pageSizeBytes": 16384,
+    "sources": [
+      {
+        "id": "badvpn",
+        "repository": "XTLS/badvpn",
+        "path": "third_party/badvpn",
+        "commitSha": "e68480088a48c8930d29f54e30e9d6deaaf32c47",
+      "licenseExpression": "BSD-3-Clause",
+        "licenseFiles": [
+          {
+            "path": "COPYING",
+            "sha256": "476e0092994b5cc6fa0190b771a6b7bc8e62ab08f3c0fbab709fef8a63ec7159"
+          },
+          {
+            "path": "lwip/COPYING",
+            "sha256": "8fb15ebdb19eb669e1d37fcd8e57a44c477fcc0e93a9ab0d181760965f94d5ed"
+          }
+        ]
+      },
+      {
+        "id": "libancillary",
+        "repository": "shadowsocks/libancillary",
+        "path": "third_party/libancillary",
+        "commitSha": "232d69a5ebb4461b572bd3f3b97088091e01c243",
+      "licenseExpression": "BSD-3-Clause",
+        "licenseFiles": [
+          {
+            "path": "COPYING",
+            "sha256": "c1283726f2b151e6a6672a91e79529fd2629ec62311ada58494116679985e438"
+          }
+        ]
+      },
+      {
+        "id": "hev-socks5-tunnel",
+        "repository": "heiher/hev-socks5-tunnel",
+        "path": "third_party/hev-socks5-tunnel",
+        "commitSha": "0239bd443fc3b217ca996383e35a0bc14662c1f5",
+        "licenseExpression": "MIT",
+        "licenseFiles": [
+          {
+            "path": "License",
+            "sha256": "3cca1a91ca82e9b9c41852945ef15858f932828ceeb765b86bc1fe3f39127514"
+          }
+        ]
+      },
+      {
+        "id": "hev-socks5-core",
+        "repository": "heiher/hev-socks5-core",
+        "path": "third_party/hev-socks5-tunnel/src/core",
+        "commitSha": "f2c71e66b32c4f63226851616c944ac733304ed3",
+        "licenseExpression": "MIT",
+        "licenseFiles": [
+          {
+            "path": "License",
+            "sha256": "3cca1a91ca82e9b9c41852945ef15858f932828ceeb765b86bc1fe3f39127514"
+          }
+        ]
+      },
+      {
+        "id": "hev-task-system",
+        "repository": "heiher/hev-task-system",
+        "path": "third_party/hev-socks5-tunnel/third-part/hev-task-system",
+        "commitSha": "203b8f23a75b7a400891c4c679a257e6c6735b0b",
+        "licenseExpression": "MIT",
+        "licenseFiles": [
+          {
+            "path": "License",
+            "sha256": "3cca1a91ca82e9b9c41852945ef15858f932828ceeb765b86bc1fe3f39127514"
+          }
+        ]
+      },
+      {
+        "id": "hev-lwip",
+        "repository": "heiher/lwip",
+        "path": "third_party/hev-socks5-tunnel/third-part/lwip",
+        "commitSha": "27372c14d0920fb4e8c6892736b1f89a60e62579",
+      "licenseExpression": "BSD-3-Clause",
+        "licenseFiles": [
+          {
+            "path": "License",
+            "sha256": "ef4aac92e05e87cd1cdc140870ed52206ba03d4a7fe46c1e11d7ffa6c87d252b"
+          }
+        ]
+      },
+      {
+        "id": "hev-yaml",
+        "repository": "heiher/yaml",
+        "path": "third_party/hev-socks5-tunnel/third-part/yaml",
+        "commitSha": "efa36117a8646d26d12b58e05bac472d7854a70d",
+        "licenseExpression": "MIT",
+        "licenseFiles": [
+          {
+            "path": "License",
+            "sha256": "3cca1a91ca82e9b9c41852945ef15858f932828ceeb765b86bc1fe3f39127514"
+          }
+        ]
+      }
+    ]
+  },
   "sourceInputs": {
     "go.mod": {
       "sha256": "dbb6b7026b6692a41a952926d0e6d8335f1e7ad7b2a43fb0668a27fc843fc87e"

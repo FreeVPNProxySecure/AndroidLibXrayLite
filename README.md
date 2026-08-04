@@ -1,6 +1,7 @@
 # AndroidLibXrayLite
 
-AndroidLibXrayLite produces the Xray Android AAR consumed by VPNProtocols.
+AndroidLibXrayLite produces the complete Xray Android native surface consumed
+by VPNProtocols: the Go/JNI AAR and the `tun2socks`/HEV tunnel binaries.
 The canonical repository and Go module are owned by the `FreeVPNProxySecure`
 organization. The historical `github.com/tim06/AndroidLibXrayLite` identity is
 retained in provenance as the legacy source path, not as a build dependency.
@@ -10,7 +11,7 @@ retained in provenance as the legacy source path, not as a build dependency.
 The complete native input contract is stored in
 [`config/native-build-lock.json`](config/native-build-lock.json). It pins the Go
 toolchain, gomobile, Android NDK, Android targets, linker policy, geo assets,
-evidence tools, and GitHub Actions commits.
+exact tunnel source commits, evidence tools, and GitHub Actions commits.
 
 Required local tools:
 
@@ -36,8 +37,9 @@ Build to a new output directory:
 scripts/build-android-aar.sh /absolute/path/to/output
 ```
 
-The build never downloads or refreshes geo assets and never mutates `go.mod`,
-`go.sum`, the NDK, or tracked source. Asset refresh is a separate reviewed
+The build never downloads or refreshes geo assets or tunnel sources and never
+mutates `go.mod`, `go.sum`, the NDK, or tracked source. Every tunnel source is
+an exact recursive Git submodule pin. Input refresh is a separate reviewed
 source change governed by [`docs/RELEASES.md`](docs/RELEASES.md).
 
 gomobile normally creates an absolute filesystem `replace` for a local package,
@@ -53,7 +55,7 @@ candidate against that contract across all four ABIs before upload.
 ## Release Model
 
 Pull requests and default-branch pushes run the same contract, test, native
-build, rebuild comparison, artifact, and evidence checks. The build workflow
+build, rebuild comparison for both output artifacts, artifact, and evidence checks. The build workflow
 only creates short-lived Actions artifacts. A separate manual release workflow
 accepts an exact successful build run, verifies its source and output manifest,
 creates an immutable annotated tag, and publishes the already verified files.

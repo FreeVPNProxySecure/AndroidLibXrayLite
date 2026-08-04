@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from scripts import validate_build_contract as contract
+from scripts.build_tunnel_bundle import expected_tunnel_entries
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,8 @@ class NativeBuildContractTest(unittest.TestCase):
         lock = contract.validate(ROOT)
         self.assertEqual("1.25.12", lock["go"]["version"])
         self.assertEqual(4, len(lock["android"]["targets"]))
+        self.assertEqual(7, len(lock["tunnels"]["sources"]))
+        self.assertEqual(8, len(expected_tunnel_entries(lock)))
 
     def test_rejects_tampered_locked_input(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

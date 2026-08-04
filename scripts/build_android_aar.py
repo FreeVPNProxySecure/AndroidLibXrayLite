@@ -12,11 +12,13 @@ import sys
 import tempfile
 
 try:
+    from .build_tunnel_bundle import build_tunnel_bundle
     from .source_module_proxy import create_source_module_proxy
     from .validate_build_contract import ContractError, validate
     from .verify_android_api import verify_android_api
     from .verify_aar import verify_archive
 except ImportError:
+    from build_tunnel_bundle import build_tunnel_bundle
     from source_module_proxy import create_source_module_proxy
     from validate_build_contract import ContractError, validate
     from verify_android_api import verify_android_api
@@ -178,6 +180,7 @@ def build(root: Path, output: Path) -> Path:
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    build_tunnel_bundle(root, output, ndk_home, source_sha)
     return artifact
 
 

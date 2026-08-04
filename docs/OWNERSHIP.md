@@ -4,10 +4,10 @@
 
 `FreeVPNProxySecure/AndroidLibXrayLite` is the canonical producer. It owns:
 
-- native Go source and the checked-in geo inputs;
+- native Go source, checked-in geo inputs, and exact tunnel source pins;
 - Go, gomobile, Android NDK, target, linker, and Actions locks;
 - deterministic tests, build scripts, and rebuild comparison;
-- native dependency, license, advisory, compatibility, and provenance evidence;
+- Go and tunnel dependency, license, advisory, compatibility, and provenance evidence;
 - annotated tags and immutable native release assets.
 
 `tim06/AndroidLibXrayLite` is the historical upstream reference for the current
@@ -29,11 +29,11 @@ build refresh.
 
 ## Consumer Boundary
 
-`FreeVPNProxySecure/VPNProtocols` owns acceptance of a released AAR: artifact
-digest, protocol capability policy, Gradle verification, SDK release evidence,
-and connected Android runtime parity. It consumes producer evidence by immutable
-release URL and digest. It does not recreate claims that only this producer can
-prove.
+`FreeVPNProxySecure/VPNProtocols` owns acceptance of the released AAR and tunnel
+bundle: artifact digests, exact expanded ELF closure, protocol capability
+policy, Gradle verification, SDK release evidence, and connected Android runtime
+parity. It consumes producer evidence by immutable release URL and digest. It
+does not recreate claims that only this producer can prove.
 
 ## Change Authority
 

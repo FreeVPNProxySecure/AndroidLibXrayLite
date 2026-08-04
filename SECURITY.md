@@ -19,10 +19,10 @@ data in a public issue.
 A supported native release must be generated from an exact reviewed
 default-branch commit and must include:
 
-- immutable source, toolchain, module, and geo asset identities;
-- independent rebuild comparison;
-- AAR, ABI, ELF, generated API, JNI, 16 KB, and path-leak checks;
-- dependency, license, and advisory evidence;
+- immutable Go, tunnel source, toolchain, module, and geo asset identities;
+- independent rebuild comparison for the AAR and tunnel bundle;
+- AAR, tunnel ZIP, ABI, ELF, generated API, JNI, 16 KB, and path-leak checks;
+- Go and tunnel dependency, license, and advisory evidence;
 - artifact checksums and build provenance;
 - an immutable annotated tag and GitHub release.
 
