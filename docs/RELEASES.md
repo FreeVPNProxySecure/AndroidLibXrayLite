@@ -29,7 +29,8 @@ the exact data portions intended by that build:
    locked manifest/Java/JNI compatibility checks, component/license/advisory
    evidence, and provenance.
 4. Download the workflow bundle and independently verify its manifest and
-   checksums before release approval.
+   checksums before release approval. The candidate bundle is retained for 10
+   days by repository policy and must not be treated as durable publication.
 
 ## Publication
 

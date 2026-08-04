@@ -179,4 +179,4 @@ jobs:
           name: xray-native-release-bundle
           path: ${{ runner.temp }}/release-bundle
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 10
