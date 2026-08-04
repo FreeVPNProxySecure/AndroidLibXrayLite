@@ -1,0 +1,110 @@
+name: Native release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: New immutable version tag
+        required: true
+        type: string
+      expected_source_sha:
+        description: Exact reviewed current main commit
+        required: true
+        type: string
+      build_run_id:
+        description: Successful Native build run for expected_source_sha
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  attestations: read
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment: native-release
+    steps:
+      - name: Checkout expected source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
+
+      - name: Validate release inputs and source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "$EXPECTED_SOURCE_SHA"
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID")"
+          test "$(jq -r .name <<<"$run_json")" = "Native build"
+          test "$(jq -r .head_sha <<<"$run_json")" = "$EXPECTED_SOURCE_SHA"
+          test "$(jq -r .conclusion <<<"$run_json")" = "success"
+          test "$(jq -r .event <<<"$run_json")" != "pull_request"
+
+      - name: Validate locked source contract
+        run: python3 scripts/validate_build_contract.py --source-sha "${{ inputs.expected_source_sha }}"
+
+      - name: Download verified build bundle
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: xray-native-release-bundle
+          path: ${{ runner.temp }}/release-bundle
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify release bundle
+        run: >-
+          python3 scripts/verify_release_bundle.py
+          "$RUNNER_TEMP/release-bundle"
+          --source-sha "${{ inputs.expected_source_sha }}"
+
+      - name: Verify GitHub build attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh attestation verify "$RUNNER_TEMP/release-bundle/libv2ray.aar"
+          --repo "$GITHUB_REPOSITORY"
+          --bundle "$RUNNER_TEMP/release-bundle/github-attestation.jsonl"
+          --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/native-build.yml"
+          --source-digest "${{ inputs.expected_source_sha }}"
+          --deny-self-hosted-runners
+
+      - name: Create or verify annotated tag
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+            test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = "tag"
+            test "$(git rev-list -n 1 "refs/tags/$RELEASE_TAG")" = "$EXPECTED_SOURCE_SHA"
+          else
+            git config user.name "FreeVPNProxySecure Release"
+            git config user.email "release@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" "$EXPECTED_SOURCE_SHA" -m "AndroidLibXrayLite $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+
+      - name: Publish immutable GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "release already exists: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-bundle"/* \
+            --verify-tag \
+            --title "AndroidLibXrayLite $RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/release-bundle/RELEASE_NOTES.md"

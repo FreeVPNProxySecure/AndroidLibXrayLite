@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "contract": "androidlibxraylite-native-build-v1",
+  "reviewedAt": "2026-08-04",
+  "canonicalRepository": "FreeVPNProxySecure/AndroidLibXrayLite",
+  "modulePath": "github.com/tim06/AndroidLibXrayLite",
+  "go": {
+    "version": "1.25.12",
+    "directive": "1.25.0",
+    "linuxAmd64ArchiveUrl": "https://go.dev/dl/go1.25.12.linux-amd64.tar.gz",
+    "linuxAmd64ArchiveSha256": "234828b7a89e0e303d2556310ee549fbcf253d28de937bac3da13d6294262ac1"
+  },
+  "jdk": {
+    "distribution": "temurin",
+    "version": "21.0.12+8.0.LTS"
+  },
+  "gomobile": {
+    "module": "golang.org/x/mobile",
+    "package": "golang.org/x/mobile/cmd/gomobile",
+    "version": "v0.0.0-20250106192035-c31d5b91ecc3",
+    "commitSha": "c31d5b91ecc32c0d598b8fe8457d244ca0b4e815",
+    "moduleSum": "h1:8LrYkH99trX3onYF3dT9frUSRDXokkceG+9tHBaDAFQ=",
+    "goModSum": "h1:sY92m3V/rTEa4JCJ1FkKHK978K6wxOSX1PStMYo+6wI="
+  },
+  "govulncheck": {
+    "package": "golang.org/x/vuln/cmd/govulncheck",
+    "version": "v1.6.0",
+    "commitSha": "19b0bb6a272792b9afa8a6983c3e9b9a1816947f",
+    "moduleSum": "h1:FeMO9Rm/HwyduOztbvKcOw+zvDEPr4I4aQNSfevFcKY=",
+    "goModSum": "h1:bWlG2493/sjR7ksvicBgMrznH3eYQEyK8ifUYBrqUbg="
+  },
+  "android": {
+    "minimumApi": 21,
+    "ndk": {
+      "release": "r28c",
+      "revision": "28.2.13676358"
+    },
+    "targets": [
+      {"gomobile": "android/arm", "abi": "armeabi-v7a"},
+      {"gomobile": "android/arm64", "abi": "arm64-v8a"},
+      {"gomobile": "android/386", "abi": "x86"},
+      {"gomobile": "android/amd64", "abi": "x86_64"}
+    ],
+    "nativeLibrary": "libgojni.so",
+    "pageSizeBytes": 16384,
+    "ldflags": "-s -w -buildid= -linkmode=external -extldflags \"-Wl,-z,common-page-size=16384 -Wl,-z,max-page-size=16384\""
+  },
+  "sourceInputs": {
+    "go.mod": {
+      "sha256": "76d90630b2a5015802fe4a8222b0888a89b5c9cb5024fe8cb7062c6a4a768f84"
+    },
+    "go.sum": {
+      "sha256": "65e5b6e37920f62603e3c24907e12cc2871339241e919cdd9218a7bf0de93ed4"
+    },
+    "assets/geoip.dat": {
+      "sha256": "83337c712b04d8c16351cf5a5394eae5cb9cfa257fb4773485945dce65dcea76",
+      "size": 20567380,
+      "sourceRepository": "dyhkwong/v2ray-geoip",
+      "sourceRelease": "202503010000",
+      "sourceUrl": "https://github.com/dyhkwong/v2ray-geoip/releases/download/202503010000/geoip.dat"
+    },
+    "assets/geosite.dat": {
+      "sha256": "186158b6c2f67ac59e184ed997ebebcef31938be9874eb8a7d5e3854187f4e8d",
+      "size": 2338864,
+      "sourceRepository": "v2ray/domain-list-community",
+      "sourceRelease": "20250829121920",
+      "sourceUrl": "https://github.com/v2ray/domain-list-community/releases/download/20250829121920/dlc.dat"
+    }
+  },
+  "actions": {
+    "actions/checkout": "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+    "actions/download-artifact": "37930b1c2abaa49bbe596cd826c3c89aef350131",
+    "actions/setup-java": "b6effb05e454b25005698d916606bdc6ffcbf961",
+    "actions/setup-go": "4dc6199c7b1a012772edbd06daecab0f50c9053c",
+    "actions/upload-artifact": "b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+    "actions/attest-build-provenance": "0f67c3f4856b2e3261c31976d6725780e5e4c373",
+    "nttld/setup-ndk": "ed92fe6cadad69be94a966a7ee3271275e62f779"
+  },
+  "release": {
+    "artifactName": "libv2ray.aar",
+    "workflowArtifactName": "xray-native-release-bundle",
+    "buildWorkflow": "native-build.yml",
+    "releaseWorkflow": "native-release.yml"
+  }
+}

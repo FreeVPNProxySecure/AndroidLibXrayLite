@@ -1,9 +1,12 @@
 .vscode
+__pycache__/
+*.pyc
 gradle/build.gradle
 *.pb.go
 binary*.go
 conf/demo/
 
 demo/
-assets/
 libv2ray*.[a|j]ar
+dist/
+evidence/
