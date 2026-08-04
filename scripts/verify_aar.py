@@ -23,7 +23,11 @@ ELF_MACHINE_BY_ABI = {
 }
 FIXED_ZIP_TIMESTAMP = (1980, 0, 0, 0, 0, 0)
 KNOWN_PATH_PREFIXES = (
-    b"/home/runner/work/",
+    b"/home/runner/",
+    b"/opt/hostedtoolcache/",
+    b"/root/go/",
+    b"/tmp/gomobile-work-",
+    b"/var/folders/",
     b"/Users/",
     b"/private/tmp/",
     b"\\Users\\",

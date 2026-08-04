@@ -124,7 +124,13 @@ def validate_lock_shape(lock: dict[str, Any]) -> None:
         raise ContractError("android.pageSizeBytes must remain 16384")
 
     source_inputs = require_object(lock.get("sourceInputs"), "sourceInputs")
-    required_inputs = {"go.mod", "go.sum", "assets/geoip.dat", "assets/geosite.dat"}
+    required_inputs = {
+        "go.mod",
+        "go.sum",
+        "assets/geoip.dat",
+        "assets/geosite.dat",
+        "config/android-api-baseline.json",
+    }
     if set(source_inputs) != required_inputs:
         raise ContractError(
             f"sourceInputs must be exactly {sorted(required_inputs)}, got {sorted(source_inputs)}"

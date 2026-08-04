@@ -26,7 +26,8 @@ the exact data portions intended by that build:
 1. Merge a reviewed producer pull request after exact-head CI.
 2. Run `Native build` for the exact default-branch commit.
 3. Require contract/test success, two clean-root builds, artifact comparison,
-   compatibility checks, component/license/advisory evidence, and provenance.
+   locked manifest/Java/JNI compatibility checks, component/license/advisory
+   evidence, and provenance.
 4. Download the workflow bundle and independently verify its manifest and
    checksums before release approval.
 

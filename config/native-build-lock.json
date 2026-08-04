@@ -53,6 +53,9 @@
     "go.sum": {
       "sha256": "65e5b6e37920f62603e3c24907e12cc2871339241e919cdd9218a7bf0de93ed4"
     },
+    "config/android-api-baseline.json": {
+      "sha256": "ad8bd3ea34482ef84a3cfe2b0ca6ee71430e87e83adb585bca95b99f1d40260c"
+    },
     "assets/geoip.dat": {
       "sha256": "83337c712b04d8c16351cf5a5394eae5cb9cfa257fb4773485945dce65dcea76",
       "size": 20567380,

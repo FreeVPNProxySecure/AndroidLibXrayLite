@@ -23,6 +23,10 @@ canonical version through a deterministic local module proxy removes the host
 path without rewriting native binaries. Generated Java/JNI API comparison is a
 mandatory release gate for this identity change.
 
+The reviewed surface is machine-locked in
+`config/android-api-baseline.json`; updating it is an API review, not a routine
+build refresh.
+
 ## Consumer Boundary
 
 `FreeVPNProxySecure/VPNProtocols` owns acceptance of a released AAR: artifact

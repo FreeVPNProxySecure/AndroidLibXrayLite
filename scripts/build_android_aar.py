@@ -14,10 +14,12 @@ import tempfile
 try:
     from .source_module_proxy import create_source_module_proxy
     from .validate_build_contract import ContractError, validate
+    from .verify_android_api import verify_android_api
     from .verify_aar import verify_archive
 except ImportError:
     from source_module_proxy import create_source_module_proxy
     from validate_build_contract import ContractError, validate
+    from verify_android_api import verify_android_api
     from verify_aar import verify_archive
 
 
@@ -159,6 +161,7 @@ def build(root: Path, output: Path) -> Path:
         run(command, root=driver, env=build_env)
 
     manifest = verify_archive(artifact, root, [str(root), temp_raw])
+    manifest["androidApi"] = verify_android_api(artifact, root, ndk_home)
     manifest["source"] = {
         "repository": lock["canonicalRepository"],
         "commitSha": source_sha,

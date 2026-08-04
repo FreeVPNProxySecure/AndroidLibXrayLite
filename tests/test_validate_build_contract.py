@@ -65,6 +65,7 @@ class NativeBuildContractTest(unittest.TestCase):
             "go.sum",
             "assets/geoip.dat",
             "assets/geosite.dat",
+            "config/android-api-baseline.json",
             ".github/workflows/native-build.yml",
             ".github/workflows/native-release.yml",
         ):

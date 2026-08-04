@@ -46,6 +46,10 @@ the exact clean commit as a deterministic local module proxy version and binds
 that version. The resulting native payload names the canonical module/version
 without embedding the checkout or temporary directory.
 
+`config/android-api-baseline.json` locks the accepted generated manifest,
+public Java class signatures, and JNI exports. Every build verifies the
+candidate against that contract across all four ABIs before upload.
+
 ## Release Model
 
 Pull requests and default-branch pushes run the same contract, test, native
