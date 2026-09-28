@@ -60,19 +60,47 @@ def require_clean_source(root: Path, env: dict[str, str]) -> str:
     return run(["git", "rev-parse", "HEAD"], root=root, env=env, capture=True).stdout.strip()
 
 
-def require_gomobile(binary: Path, lock: dict, root: Path, env: dict[str, str]) -> None:
+def mobile_tool_package(lock: dict, tool: str) -> str:
+    return f"{lock['gomobile']['module']}/cmd/{tool}"
+
+
+def require_mobile_tool(
+    binary: Path, tool: str, lock: dict, root: Path, env: dict[str, str]
+) -> None:
+    """Require the Go build info of a gomobile tool to name the locked module."""
     metadata = run(
         ["go", "version", "-m", str(binary)],
         root=root,
         env=env,
         capture=True,
     ).stdout
-    tool = lock["gomobile"]
-    expected = f"mod\t{tool['module']}\t{tool['version']}\t{tool['moduleSum']}"
-    if expected not in metadata:
+    locked = lock["gomobile"]
+    expected = (
+        f"\tpath\t{mobile_tool_package(lock, tool)}\n",
+        f"\tmod\t{locked['module']}\t{locked['version']}\t{locked['moduleSum']}\n",
+    )
+    if not all(line in metadata for line in expected):
         raise ContractError(
-            "gomobile binary does not match the locked module/version/checksum"
+            f"{tool} binary does not match the locked module/version/checksum"
         )
+
+
+def install_gobind(lock: dict, root: Path, env: dict[str, str], directory: Path) -> Path:
+    """Install gobind from the locked gomobile module into directory.
+
+    `gomobile init` runs `go install .../cmd/gobind@latest`, which resolves
+    whatever version is newest when the build runs. `gomobile bind` only needs
+    gobind on PATH, so the build installs the locked version instead.
+    """
+    package = mobile_tool_package(lock, "gobind")
+    run(
+        ["go", "install", f"{package}@{lock['gomobile']['version']}"],
+        root=root,
+        env={**env, "GOBIN": str(directory)},
+    )
+    gobind = directory / "gobind"
+    require_mobile_tool(gobind, "gobind", lock, root, env)
+    return gobind
 
 
 def build(root: Path, output: Path) -> Path:
@@ -113,8 +141,7 @@ def build(root: Path, output: Path) -> Path:
     if not gomobile_raw:
         raise ContractError("gomobile is not installed")
     gomobile = Path(gomobile_raw).resolve()
-    require_gomobile(gomobile, lock, root, env)
-    run([str(gomobile), "init"], root=root, env=env)
+    require_mobile_tool(gomobile, "gomobile", lock, root, env)
 
     artifact = output / lock["release"]["artifactName"]
     targets = ",".join(target["gomobile"] for target in lock["android"]["targets"])
@@ -138,11 +165,17 @@ def build(root: Path, output: Path) -> Path:
             ")\n",
             encoding="utf-8",
         )
+        tools = temp / "bin"
+        gobind = install_gobind(lock, root, env, tools)
         build_env = {
             **env,
             "GONOSUMDB": lock["modulePath"],
             "GOPROXY": f"file://{proxy['proxyRoot']},https://proxy.golang.org",
+            "PATH": f"{tools}{os.pathsep}{env.get('PATH', '')}",
         }
+        resolved = shutil.which("gobind", path=build_env["PATH"])
+        if resolved is None or Path(resolved).resolve() != gobind.resolve():
+            raise ContractError("gomobile bind would not run the verified gobind")
         prepare_env = {**build_env, "GOFLAGS": "-mod=mod"}
         run(
             ["go", "mod", "download", "all"],
