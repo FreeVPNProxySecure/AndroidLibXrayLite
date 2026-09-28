@@ -15,7 +15,7 @@ exact tunnel source commits, evidence tools, and GitHub Actions commits.
 
 Required local tools:
 
-- Go `1.25.12`;
+- Go `1.25.13`;
 - Android NDK `28.2.13676358` (`r28c`);
 - JDK 17 or newer for gomobile Android packaging;
 - Python 3;

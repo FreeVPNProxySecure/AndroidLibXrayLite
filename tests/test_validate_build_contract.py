@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class NativeBuildContractTest(unittest.TestCase):
     def test_repository_contract_is_valid(self) -> None:
         lock = contract.validate(ROOT)
-        self.assertEqual("1.25.12", lock["go"]["version"])
+        self.assertEqual("1.25.13", lock["go"]["version"])
         self.assertEqual(4, len(lock["android"]["targets"]))
         self.assertEqual(7, len(lock["tunnels"]["sources"]))
         self.assertEqual(8, len(expected_tunnel_entries(lock)))
