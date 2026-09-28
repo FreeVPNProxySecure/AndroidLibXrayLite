@@ -49,8 +49,14 @@ that version. The resulting native payload names the canonical module/version
 without embedding the checkout or temporary directory.
 
 `config/android-api-baseline.json` locks the accepted generated manifest,
-public Java class signatures, and JNI exports. Every build verifies the
-candidate against that contract across all four ABIs before upload.
+public Java class signatures, JNI exports, and the digest of the embedded
+consumer keep rules. Every build verifies the candidate against that contract
+across all four ABIs before upload.
+
+gomobile writes `-keep class go.** { *; }` and `-keep class libv2ray.** { *; }`
+into the AAR. The build replaces them with exact rules for the classes and
+members the native code resolves by name (`scripts/consumer_rules.py`), and
+`verify_aar.py` rejects an AAR whose rules differ from that JNI contract.
 
 ## Release Model
 

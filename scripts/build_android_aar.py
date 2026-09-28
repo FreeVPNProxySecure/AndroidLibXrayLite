@@ -13,12 +13,14 @@ import tempfile
 
 try:
     from .build_tunnel_bundle import build_tunnel_bundle
+    from .consumer_rules import replace_rules
     from .source_module_proxy import create_source_module_proxy
     from .validate_build_contract import ContractError, validate
     from .verify_android_api import verify_android_api
     from .verify_aar import verify_archive
 except ImportError:
     from build_tunnel_bundle import build_tunnel_bundle
+    from consumer_rules import replace_rules
     from source_module_proxy import create_source_module_proxy
     from validate_build_contract import ContractError, validate
     from verify_android_api import verify_android_api
@@ -162,6 +164,7 @@ def build(root: Path, output: Path) -> Path:
         ]
         run(command, root=driver, env=build_env)
 
+    replace_rules(artifact)
     manifest = verify_archive(artifact, root, [str(root), temp_raw])
     manifest["androidApi"] = verify_android_api(artifact, root, ndk_home)
     manifest["source"] = {
