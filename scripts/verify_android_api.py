@@ -43,6 +43,9 @@ def load_baseline(root: Path) -> dict[str, Any]:
         raise ContractError("Android API baseline must contain JNI exports")
     if exports != sorted(set(exports)):
         raise ContractError("Android API baseline JNI exports must be sorted and unique")
+    rules = baseline.get("consumerRulesSha256")
+    if not isinstance(rules, str) or len(rules) != 64 or rules.strip("0123456789abcdef"):
+        raise ContractError("Android API baseline must lock the consumer rules SHA-256")
     return baseline
 
 
@@ -148,11 +151,15 @@ def verify_android_api(artifact: Path, root: Path, ndk_home: Path) -> dict[str, 
             if actual_exports != expected_exports:
                 raise ContractError(f"generated JNI export drift for {abi}")
             export_counts[abi] = len(actual_exports)
+        rules_sha256 = hashlib.sha256(archive.read("proguard.txt")).hexdigest()
+        if rules_sha256 != baseline["consumerRulesSha256"]:
+            raise ContractError("generated consumer rules drift")
     return {
         "contract": baseline["contract"],
         "baselineSha256": sha256_file(root / BASELINE_PATH),
         "publicClassCount": len(actual_signatures),
         "jniExportCounts": export_counts,
+        "consumerRulesSha256": rules_sha256,
         "manifest": baseline["manifest"],
     }
 

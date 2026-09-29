@@ -196,3 +196,25 @@ jobs:
           path: ${{ runner.temp }}/release-bundle
           if-no-files-found: error
           retention-days: 10
+
+      # Failure path only: keep the raw evidence inputs (for example govulncheck.json)
+      # for diagnosis. The job still fails; nothing here is verified or releasable.
+      - name: Mark failure diagnostics as unverified
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-bundle"
+          printf '%s\n' \
+            "UNVERIFIED failure diagnostics of run $GITHUB_RUN_ID at $GITHUB_SHA." \
+            "Raw evidence inputs only; not a verified or release bundle." \
+            > "$RUNNER_TEMP/release-bundle/UNVERIFIED-FAILURE-DIAGNOSTICS.txt"
+
+      - name: Upload unverified failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: unverified-failure-diagnostics
+          path: |
+            ${{ runner.temp }}/release-bundle/*.json
+            ${{ runner.temp }}/release-bundle/*.txt
+          if-no-files-found: ignore
+          retention-days: 10

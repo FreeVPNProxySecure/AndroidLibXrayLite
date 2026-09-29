@@ -1,4 +1,5 @@
 {
+  "consumerRulesSha256": "6d41d3cd1d2c73f60cd4cee5db44676a5a2dddbb1140fb67c21a2ece66b6c65d",
   "contract": "androidlibxraylite-android-api-v1",
   "jniExports": [
     "Java_go_Seq_destroyRef",

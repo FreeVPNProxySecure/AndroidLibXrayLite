@@ -13,8 +13,10 @@ from typing import Any
 import zipfile
 
 try:
+    from .consumer_rules import RULES_ENTRY, generate as generate_consumer_rules
     from .validate_build_contract import ContractError, load_lock, sha256_file
 except ImportError:
+    from consumer_rules import RULES_ENTRY, generate as generate_consumer_rules
     from validate_build_contract import ContractError, load_lock, sha256_file
 
 
@@ -117,6 +119,7 @@ def verify_archive(
     required_entries = {
         "AndroidManifest.xml",
         "classes.jar",
+        RULES_ENTRY,
         "assets/geoip.dat",
         "assets/geosite.dat",
         *(f"jni/{abi}/{library_name}" for abi in expected_abis),
@@ -189,6 +192,12 @@ def verify_archive(
             locked = lock["sourceInputs"][asset]
             if len(payload) != locked["size"] or sha256_bytes(payload) != locked["sha256"]:
                 raise ContractError(f"embedded locked asset mismatch: {asset}")
+
+        expected_rules = generate_consumer_rules(archive.read("classes.jar")).encode("utf-8")
+        if archive.read(RULES_ENTRY) != expected_rules:
+            raise ContractError(
+                f"{RULES_ENTRY} differs from the rules of the gomobile JNI contract"
+            )
 
     return {
         "schemaVersion": 1,

@@ -15,6 +15,7 @@ class AndroidApiContractTest(unittest.TestCase):
         baseline = load_baseline(ROOT)
         self.assertEqual(17, len(baseline["publicClassSignatures"]))
         self.assertEqual(35, len(baseline["jniExports"]))
+        self.assertRegex(baseline["consumerRulesSha256"], "^[0-9a-f]{64}$")
 
     def test_manifest_rejects_added_surface(self) -> None:
         baseline = load_baseline(ROOT)
